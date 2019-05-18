@@ -1,0 +1,44 @@
+library verilog;
+use verilog.vl_types.all;
+entity cache_control is
+    port(
+        clk             : in     vl_logic;
+        data0_check     : in     vl_logic;
+        data1_check     : in     vl_logic;
+        hit             : in     vl_logic;
+        tags1_read      : out    vl_logic;
+        tags1_load      : out    vl_logic;
+        tags2_read      : out    vl_logic;
+        tags2_load      : out    vl_logic;
+        valid0_read     : out    vl_logic;
+        valid0_load     : out    vl_logic;
+        valid1_read     : out    vl_logic;
+        valid1_load     : out    vl_logic;
+        lru_read        : out    vl_logic;
+        lru_load        : out    vl_logic;
+        lru_sel         : out    vl_logic;
+        lru_out         : in     vl_logic;
+        data1_read      : out    vl_logic;
+        data2_read      : out    vl_logic;
+        data0_mux_sel   : out    vl_logic;
+        data1_mux_sel   : out    vl_logic;
+        read_data_sel   : out    vl_logic_vector(1 downto 0);
+        write_en0_sel   : out    vl_logic_vector(1 downto 0);
+        write_en1_sel   : out    vl_logic_vector(1 downto 0);
+        pmem_address_mux_sel: out    vl_logic_vector(1 downto 0);
+        mem_read        : in     vl_logic;
+        mem_write       : in     vl_logic;
+        mem_resp        : out    vl_logic;
+        pmem_resp       : in     vl_logic;
+        pmem_read       : out    vl_logic;
+        pmem_write      : out    vl_logic;
+        dirty_in        : out    vl_logic;
+        dirty1_out      : in     vl_logic;
+        dirty2_out      : in     vl_logic;
+        dirty1_load     : out    vl_logic;
+        dirty2_load     : out    vl_logic;
+        dirty1_read     : out    vl_logic;
+        dirty2_read     : out    vl_logic;
+        pmem_wdata_mux_sel: out    vl_logic
+    );
+end cache_control;

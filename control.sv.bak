@@ -1,0 +1,300 @@
+import rv32i_types::*; /* Import types defined in rv32i_types.sv */
+
+module control
+(
+    /* Input and output port declarations */
+	 input clk,
+	/* Datapath controls */
+	input rv32i_opcode opcode,
+	output logic load_pc,
+	output logic load_ir,
+	output logic load_regfile,
+	output logic alumux1_sel,
+	output logic [1:0] alumux2_sel,
+	output alu_ops aluop,
+	/* et cetera */
+	output logic load_mar,
+	output logic load_mdr,
+	output logic load_data_out,
+	output logic pcmux_sel,
+	output logic [1:0] regfilemux_sel,
+	output logic marmux_sel,
+	output logic cmpmux_sel,
+	
+	input rv32i_reg rs1,
+	input rv32i_reg rs2,
+	input [2:0] funct3,
+	input [6:0] funct7,
+	input br_en,
+	
+	output branch_funct3_t cmpop,
+	
+	
+	/* Memory signals */
+	input mem_resp,
+	output logic mem_read,
+	output logic mem_write,
+	output rv32i_mem_wmask mem_byte_enable
+	
+);
+
+/*
+* The following ~54 lines of code have been added to help you drive the
+* verification monitor. This is not required but we think it will help you
+* with testing so we've tried to make it as easy as possible for you to get it
+* up and running.
+* */
+logic trap;
+logic [4:0] rs1_addr, rs2_addr;
+logic [3:0] rmask, wmask;
+branch_funct3_t branch_funct3;
+store_funct3_t store_funct3;
+load_funct3_t load_funct3;
+
+assign branch_funct3 = branch_funct3_t'(funct3);
+assign load_funct3 = load_funct3_t'(funct3);
+assign store_funct3 = store_funct3_t'(funct3);
+
+always_comb
+begin : trap_check
+    trap = 0;
+    rmask = 0;
+    wmask = 0;
+
+    case (opcode)
+        op_lui, op_auipc, op_imm:;
+
+        op_br: begin
+            case (branch_funct3)
+                beq, bne, blt, bge, bltu, bgeu:;
+                default: trap = 1;
+            endcase
+        end
+
+        op_load: begin
+            case (load_funct3)
+                lw: rmask = 4'b1111;
+                default: trap = 1;
+            endcase
+        end
+
+        op_store: begin
+            case (store_funct3)
+                sw: wmask = 4'b1111;
+                default: trap = 1;
+            endcase
+        end
+
+        default: trap = 1;
+    endcase
+
+end
+
+
+
+
+
+
+
+enum int unsigned {
+    /* List of states */
+	fetch1,
+	fetch2,
+	fetch3,
+	decode,
+	s_auipc,
+	////////////////
+	br,
+	s_lui,
+	s_imm,
+	calc_addr,
+	ldr1,
+	ldr2,
+	str1,
+	str2
+} state, next_states;
+
+always_comb
+begin : state_actions
+	 /* Default output assignments */
+    /* Actions for each state */
+	 /* Default assignments */
+	load_pc = 1'b0;
+	load_ir = 1'b0;
+	load_regfile = 1'b0;
+	alumux1_sel = 1'b0;
+	alumux2_sel = 2'b00;
+
+	//in many cases, aluop will be the same as funct3, so just typecast
+	//it
+	aluop = alu_ops'(funct3);
+	mem_read = 1'b0;
+	mem_write = 1'b0;
+	mem_byte_enable = 4'b1111;
+	pcmux_sel = 0;
+	/* et cetera (see Appendix E) */
+	load_mar = 1'b0;
+	load_mdr = 1'b0;
+	load_data_out = 1'b0;
+	cmpop = branch_funct3_t'(funct3);
+	regfilemux_sel= 2'b0;
+	marmux_sel = 1'b0;
+	cmpmux_sel = 1'b0;
+	rs1_addr = 5'b0;
+	rs2_addr = 5'b0;
+	
+	
+	case(state)
+		fetch1: begin
+			/* MAR <= PC */
+			load_mar = 1;
+		end
+
+		fetch2: begin
+			/* Read memory */
+			mem_read = 1;
+			load_mdr = 1;
+		end
+
+		fetch3: begin
+			/* Load IR */
+			load_ir = 1;
+		end
+
+		decode: /* Do nothing */;
+
+		s_auipc: begin
+			/* DR <= PC + u_imm */
+			load_regfile = 1;
+			//PC is the first input to the ALU
+			alumux1_sel = 1;
+			//the u-type immediate is the second input to the ALU
+			alumux2_sel = 1;
+			//in the case of auipc, funct3 is some random bits so we
+			//must explicitly set the aluop
+			aluop = alu_add;
+			/* PC <= PC + 4 */
+			load_pc = 1;
+		end
+		
+		s_imm: begin 
+			load_regfile =1;
+			load_pc =1;
+			rs1_addr = rs1;
+			
+			if (funct3 == 3'b000)
+				begin
+					cmpop =blt;
+					regfilemux_sel =1;
+					cmpmux_sel =1;
+				end
+			else if (funct3 == 3'b011)
+				begin
+					cmpop =bltu;
+					regfilemux_sel =1;
+					cmpmux_sel =1;					
+				end
+			else 
+				begin
+					if (funct7 == 7'b0100000)
+						begin
+							aluop = alu_sra;
+						end
+					else
+						begin
+							aluop=alu_ops'(funct3);
+						end
+				end
+		end
+		
+		s_lui: begin
+			load_regfile =1;
+			load_pc = 1;
+		end
+		
+		calc_addr: begin ///////////////////////////////////////////
+			aluop = alu_add;
+			load_mar =1;
+			marmux_sel =1;
+			if (opcode == op_store)
+				begin
+					alumux2_sel =3;
+					load_data_out =1;
+				end
+		end
+		
+		br: begin
+			pcmux_sel = br_en;
+			load_pc =1;
+			alumux1_sel =1;
+			alumux2_sel =2;
+			aluop = alu_add;
+			
+		end
+		
+		ldr1: begin
+			load_mdr =1;
+			mem_read =1;
+		end
+			
+		ldr2: begin
+			regfilemux_sel =3;
+			load_regfile =1;
+			load_pc =1;
+			rs1_addr = rs1;			
+		end
+		
+		str1: begin
+			mem_write =1;
+		end
+		
+		str2: begin
+			load_pc =1;
+			rs1_addr =rs1;
+			rs2_addr =rs2;
+		end
+		
+		
+		default: /* Do nothing */;
+	endcase
+end
+
+
+always_comb
+begin : next_state_logic
+    /* Next state information and conditions (if any)
+     * for transitioning between states */
+	 next_states = state;
+	 case(state)
+		fetch1: next_states = fetch2;
+		fetch2: if (mem_resp) next_states= fetch3;
+		fetch3: next_states = decode;
+		decode: begin
+			case(opcode)
+				op_auipc: next_states = s_auipc;
+				op_br: next_states = br;
+				op_imm: next_states = s_imm;
+				op_lui: next_states = s_lui;
+				op_load: next_states  = calc_addr;
+				op_store: next_states  = calc_addr;
+				default: $display("Unknown␣opcode");
+			endcase
+		end
+		calc_addr: begin
+			if (opcode == op_load) next_states = ldr1;
+			else next_states = str1;
+		end
+		ldr1: if (mem_resp) next_states = ldr2;
+		str1: if (mem_resp) next_states = str2;
+		default: next_states = fetch1;
+	 endcase
+	  
+end
+
+always_ff @(posedge clk)
+begin: next_state_assignment
+    /* Assignment of next state on clock edge */
+	 state <= next_states;
+end
+
+endmodule : control

@@ -1,0 +1,21 @@
+module mux4 #(parameter width = 32)
+(
+	input [2:0]sel,
+	input [width-1:0] a, b, c, d, e, //f, g, h,
+	output logic [width-1:0] o
+);
+
+always_comb
+begin
+	case(sel)
+		2'b000: o = a;
+		2'b001: o = b;
+		2'b010: o = c;
+		2'b011: o = d;
+		2'b100: o = e;
+		2'b101: o = 0;
+		2'b110: o = 0;
+		default: o = 0;
+	endcase	
+end
+endmodule : mux4

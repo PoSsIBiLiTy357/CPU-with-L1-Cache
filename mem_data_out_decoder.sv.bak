@@ -1,0 +1,23 @@
+import rv32i_types::*;
+
+module mem_data_out_decoder
+(
+    input [31:0]rs2_out,
+    input mem_address,
+    output rv32i_word f
+);
+
+
+always_comb
+begin
+
+	case(mem_address%4)
+		0: f = rs2_out;
+		1: f = {rs2_out[23:0],8'b0};
+		2: f = {rs2_out[15:0],16'b0};
+		3:	f = {rs2_out[7:0],24'b0};
+		default:f = rs2_out;
+	endcase
+end
+
+endmodule: mem_data_out_decoder

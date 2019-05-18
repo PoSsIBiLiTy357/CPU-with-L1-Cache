@@ -1,0 +1,25 @@
+import rv32i_types::*;
+
+module cmp #(parameter width = 32)
+(
+	input [31:0] a,
+	input [31:0] b,
+	input branch_funct3_t cmpop,
+	output logic f
+);
+
+always_comb
+begin
+    case (cmpop)
+        3'b000:  f = (a==b);
+        3'b001:  f = (a!=b);
+        3'b100:  f = ($signed(a)< $signed(b));
+        3'b101:  f = ($signed(a) >= $signed(b));
+        3'b110:  f = (a < b);
+        3'b111:  f = (a >= b);
+
+    endcase
+end
+
+endmodule : cmp
+
